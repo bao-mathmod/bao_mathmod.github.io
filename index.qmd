@@ -2,7 +2,11 @@
 title: "ScRNA"
 ---
 
-## Loading required libraries 
+# Pre-Processed Data
+
+## Loading required libraries
+
+To run the single cell RNA
 
 ```{r}
 library(Seurat)
@@ -15,4 +19,97 @@ library(SingleR)
 library(celldex)
 library(RColorBrewer)
 library(SingleCellExperiment)
+```
+
+## Create the function
+
+```{r}
+# Function for running the standard pre-processing on Seurat object
+Standard_PreProcessing_QC <- function(input){
+  # Calculate percentage of mitochondrial counts
+  print("Calculate % of mitochondrial counts")
+  input <- PercentageFeatureSet(input, pattern = "^MT-" ,  col.name = "percent.mt")
+  
+  # Apply sctransform normalization
+  print("SCTransform Normalization")
+  input <- SCTransform(input, verbose = FALSE)
+  
+  # Perform linear dimensional reduction
+  print("Perform linear dimensional reduction")
+  input <- RunPCA(input ,  verbose = FALSE)
+  
+  # Cluster the cells
+  print("Cluster the cells")
+  input <- FindNeighbors(input, dims = 1:30)
+  input <- FindClusters(input,  verbose = FALSE)
+  
+  # Run non-linear dimensional reduction (UMAP)
+  print("Run non-linear dimensional reduction (UMAP)")
+  input <- RunUMAP(input, dims = 1:30 ,  verbose = FALSE)
+  return(input)
+}
+```
+
+## Create required object: Soup Channel
+
+```{r}
+sc_SoupX <- load10X("D:/Genome_Biology/Reproduce/Pre_Processed")
+```
+
+## Create required object: Seurat Object
+
+```{r}
+sc_Seurat <- Read10X("D:/Genome_Biology/Reproduce/Pre_Processed/filtered_feature_bc_matrix")
+# Directory of filtered_feature_bc_matrix processed by cellRangercount
+sc_Seurat <- CreateSeuratObject(counts = sc_Seurat)
+sc_Seurat
+# Run standard pre-processing on Seurat object
+sc_Seurat <- Standard_PreProcessing_QC(sc_Seurat)
+```
+
+```{r}
+# Add clustering information 
+clustering_info <- data.frame(Cluster = sc_Seurat@meta.data$SCT_snn_res.0.8)
+head(clustering_info)
+table(clustering_info)
+
+rownames(clustering_info) <- rownames(sc_Seurat@meta.data)
+head(clustering_info)
+
+sc_SoupX <- setClusters(sc_SoupX, setNames(clustering_info$Cluster, rownames(clustering_info)))
+```
+
+```{r}
+# Provide the list of Immunoglobulin (Ig) genes.
+igGenes <- c("IGHA1", "IGHA2", "IGHG1", "IGHG2", "IGHG3", "IGHG4", "IGHD", "IGHE", 
+             "IGHM", "IGLC1", "IGLC2", "IGLC3", "IGLC4", "IGLC5", "IGLC6", "IGLC7", "IGKC")
+```
+
+```{r}
+# Estimating the contamination fraction
+sc = autoEstCont(sc_SoupX)
+```
+
+```{r}
+# Estimate non-expressing cells 
+useToEst <- estimateNonExpressingCells(sc_SoupX, nonExpressedGeneList = list(IG = igGenes))
+```
+
+```{r}
+# Calculate the contamination fraction
+sc_SoupX <- calculateContaminationFraction(sc_SoupX, list(IG = igGenes), useToEst = useToEst)
+```
+
+```{r}
+head(sc_SoupX$soupProfile[order(sc_SoupX$soupProfile$est, decreasing = TRUE), ], n = 20)
+```
+
+```{r}
+# Correct the expression profile 
+sc_SoupX_output <- adjustCounts(sc_SoupX)
+```
+
+```{r}
+# Save corrected expression matrices 
+DropletUtils:::write10xCounts("D:/Genome_Biology/Reproduce/Pre_Processed/SoupX",sc_SoupX_output)
 ```

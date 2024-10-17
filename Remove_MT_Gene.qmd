@@ -1,0 +1,198 @@
+---
+title: "Remove Mitochondria Gene and Exclude Doublet"
+format: html
+editor: visual
+---
+
+# Remove Mitochondrial Gene 
+
+## Load Libraries
+
+```{r}
+library(Seurat)
+library(SoupX)
+library(DropletUtils)
+library(DoubletFinder)
+library(stringr)
+library(ggplot2)
+library(SingleR)
+library(celldex)
+library(RColorBrewer)
+library(SingleCellExperiment)
+```
+
+## Create Seurat Object
+
+```{r}
+# Create Seurat object
+sc_Seurat <- Read10X(data.dir = "D:/Genome_Biology/Reproduce/Pre_Processed/SoupX") # Directory of corrected expression matrices processed by SoupX
+sc_Seurat <- CreateSeuratObject(counts = sc_Seurat)
+sc_Seurat_procesing <- sc_Seurat
+sc_Seurat_procesing
+```
+
+## Calculate Percentage MT Counts
+
+```{r}
+# Calculate percentage of MT counts
+sc_Seurat_procesing[["percent.mt"]] <- PercentageFeatureSet(sc_Seurat_procesing, pattern = "^MT-")
+```
+
+```{r}
+meta <- sc_Seurat_procesing@meta.data
+dim(meta)
+```
+
+```{r}
+BiocManager::install('glmGamPoi')
+library(glmGamPoi)
+```
+
+```{r}
+sc_Seurat_procesing <- SCTransform(sc_Seurat_procesing, verbose = FALSE)
+```
+
+```{r}
+sc_Seurat_procesing <- RunPCA(sc_Seurat_procesing ,  verbose = FALSE)
+```
+
+```{r}
+sc_Seurat_procesing <- FindNeighbors(sc_Seurat_procesing, dims = 1:30)
+```
+
+```{r}
+sc_Seurat_procesing <- FindClusters(sc_Seurat_procesing,  verbose = FALSE)
+```
+
+```{r}
+sc_Seurat_procesing <- RunUMAP(sc_Seurat_procesing, dims = 1:30 ,  verbose = FALSE)
+```
+
+## Quality MT genes
+
+```{r}
+# Exclude cells that have more than 10% of mitochondrial counts
+sc_Seurat_procesing <- subset(sc_Seurat_procesing, subset =  percent.mt < 10)
+```
+
+```{r}
+# Extract the cells that pass % mitochondrial cut-off
+sc_Seurat_procesing <- subset(sc_Seurat , cells = colnames(sc_Seurat_procesing))
+sc_Seurat_procesing
+```
+
+# Exclude Doublet Finders
+
+## Create the function 
+
+```{r}
+# Function for running the standard pre-processing on Seurat object
+sc_Seurat_procesing_2 <- function(input){
+
+  # Apply sctransform normalization
+  print("Normalize Data")
+  input <- NormalizeData(input, verbose = FALSE)
+  
+  #Find variable Features 
+  print("Find variable Features")
+  input <- FindVariableFeatures(input, selection.method = "vst", nfeatures = 2000)
+  
+  # Scale data 
+  print("Scale data")
+  input <- ScaleData(input)
+  
+  # Run PCA
+  print("Run PCA")
+  input <- RunPCA(input,  verbose = FALSE)
+  
+  # Find neighbors
+  print("Find Neigbors")
+  input <- FindNeighbors(input, dims = 1:30)
+  
+  #Find clusters
+  print("Find Cluster")
+  input <- FindClusters(input,  verbose = FALSE)
+  
+  # Run non-linear dimensional reduction (UMAP)
+  print("Run non-linear dimensional reduction (UMAP)")
+  input <- RunUMAP(input, dims = 1:30 ,  verbose = FALSE)
+  return(input)
+}
+```
+
+## Processing
+
+```{r}
+sc_Seurat_procesing <- sc_Seurat_procesing_2(sc_Seurat_procesing)
+```
+
+## Running Doublet Finders
+
+```{r}
+sweep.res.list <- paramSweep(sc_Seurat_procesing, PCs = 1:30, sct = FALSE,num.cores = 1) # num.score default = 1
+```
+
+```{r}
+sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
+pK_value <- find.pK(sweep.stats)
+```
+
+### Visualize pK value 
+
+```{r}
+# Visualize the pK value at maximum mean-variance-normalized bimodality coefficient (MeanBC)  
+ggplot(pK_value, aes(pK, MeanBC, group = 1)) +
+  geom_point() +
+  geom_line()
+```
+
+### Extract pK value
+
+```{r}
+# Extract the pK value at maximum mean-variance-normalized bimodality coefficient (MeanBC)
+max(pK_value$MeanBC)
+pK <- subset(pK_value, pK_value$MeanBC==max(pK_value$MeanBC),2)
+pK
+pK <- as.numeric(as.character.factor(pK[1,1]))
+```
+
+### Predict Doublets
+
+```{r}
+# Predict doublets 
+annotations <- sc_Seurat_procesing@meta.data$seurat_clusters
+
+homotypic.prop <- modelHomotypic(annotations)
+
+nExp_poi <- round(0.04*length(sc_Seurat_procesing%>%colnames))  # Assuming 4.0% doublet formation rate according to the 10x protocol
+
+nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+```
+
+```{r}
+sc_Seurat_procesing <- doubletFinder(sc_Seurat_procesing, 
+                                        PCs = 1:30, 
+                                        pN = 0.25, 
+                                        pK = pK, 
+                                        nExp = nExp_poi, 
+                                        reuse.pANN = FALSE, 
+                                        sct = FALSE)
+colnames(sc_Seurat_procesing@meta.data)[length(sc_Seurat_procesing@meta.data)] <- "DoubletFinder"
+```
+
+### Visualize and Exclude doublets
+
+```{r}
+# Visualise the doublets 
+DimPlot(sc_Seurat_procesing , group.by = "DoubletFinder" , cols = c("yellow" , "grey"))
+```
+
+```{r}
+# Exclude the doublets
+sc_Seurat <- subset(sc_Seurat , cells =  rownames(sc_Seurat_procesing@meta.data[sc_Seurat_procesing@meta.data$DoubletFinder == "Singlet",]))
+sc_Seurat
+```
+
+```{r}
+saveRDS(sc_Seurat, file = "D:/Genome_Biology/Reproduce/Pre_Processed/Final_Preprocessed.rds")
+```

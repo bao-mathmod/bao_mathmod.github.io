@@ -2,8 +2,16 @@
 title: "About"
 ---
 
-About this site
+# Acknowledgements
 
-```{r}
-1 + 1
-```
+I would like to express my sincere gratitude to all those who have contributed to the successful completion of this internship.
+
+First and foremost, I am immensely grateful to Prof. Muratani of the Genome Biology Team at the Tsukuba University for his invaluable guidance, support, and encouragement during my research period. His insights and expertise have been instrumental in the completion of this final presentation.
+
+I am thankful to my Japan's advisor, Ms. Cohen of the International office, Tsukuba University – Japan, for her continuous support and valuable suggestions throughout the program. Her encouragement has been a source of motivation for me.
+
+I would also like to extend my sincere thanks to my Teacher Assistant (TA) Liao and Yuka for helping me during this program. The knowledge and experience gained will undoubtedly be beneficial in my future.
+
+I would also like to acknowledge the contributions of my colleagues and team members at the Genome Biology Team. Their collaboration and support fostered a stimulating and productive work environment.
+
+Finally, I extend my heartfelt thanks to my family and friends for their unwavering belief in me and their constant support. Their encouragement has been a source of strength throughout this journey.
