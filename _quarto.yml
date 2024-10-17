@@ -6,7 +6,8 @@ website:
   title: "ScRNA"
   navbar:
     left:
-      - about.qmd
+      - text: "About"
+        href: about.qmd
       - text: "Pre Processed Data"
         href: index.qmd
       - text: "Remove MT gene and Exclude Doublet Finders"
