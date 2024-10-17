@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-# Remove Mitochondrial Gene 
+# Remove Mitochondrial Gene
 
 ## Load Libraries
 
@@ -83,7 +83,7 @@ sc_Seurat_procesing
 
 # Exclude Doublet Finders
 
-## Create the function 
+## Create the function
 
 ```{r}
 # Function for running the standard pre-processing on Seurat object
@@ -137,7 +137,7 @@ sweep.stats <- summarizeSweep(sweep.res.list, GT = FALSE)
 pK_value <- find.pK(sweep.stats)
 ```
 
-### Visualize pK value 
+### Visualize pK value
 
 ```{r}
 # Visualize the pK value at maximum mean-variance-normalized bimodality coefficient (MeanBC)  
